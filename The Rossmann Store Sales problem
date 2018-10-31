@@ -1,0 +1,99 @@
+# Random Forest Regression
+
+# Importing the libraries
+import numpy as np
+import matplotlib.pyplot as plt
+import pandas as pd
+
+# Importing the dataset
+store = pd.read_csv('store.csv')
+test = pd.read_csv('test.csv')
+train = pd.read_csv('train.csv')
+
+def transform(data):
+    #remove NaN
+    data.fillna(0, inplace=True)
+    
+    #change the StateHoliday format 
+    data.loc[data['StateHoliday'] == 'a', 'StateHoliday'] = '1'
+    data.loc[data['StateHoliday'] == 'b', 'StateHoliday'] = '2'
+    data.loc[data['StateHoliday'] == 'c', 'StateHoliday'] = '3'
+    data['StateHoliday'] = data['StateHoliday'].astype(float)
+    
+    #change the StoreType format 
+    data.loc[data['StoreType'] == 'a', 'StoreType'] = '1'
+    data.loc[data['StoreType'] == 'b', 'StoreType'] = '2'
+    data.loc[data['StoreType'] == 'c', 'StoreType'] = '3'
+    data.loc[data['StoreType'] == 'd', 'StoreType'] = '4'
+    data['StoreType'] = data['StoreType'].astype(float)
+    
+    #change the Assortment format 
+    data.loc[data['Assortment'] == 'a', 'Assortment'] = '1'
+    data.loc[data['Assortment'] == 'b', 'Assortment'] = '2'
+    data.loc[data['Assortment'] == 'c', 'Assortment'] = '3'
+    data['Assortment'] = data['Assortment'].astype(float)
+    
+    #split the column Date to 3 new columns
+    data['year'] = data.Date.apply(lambda x: x.split('-')[0])
+    data['year'] = data['year'].astype(float)
+    data['month'] = data.Date.apply(lambda x: x.split('-')[1])
+    data['month'] = data['month'].astype(float)
+    data['day'] = data.Date.apply(lambda x: x.split('-')[2])
+    data['day'] = data['day'].astype(float)
+    
+    #split the column PromoInterval to 4 new columns
+    data.loc[data['PromoInterval'] == 0, 'PromoInterval'] = '0,0,0,0'
+    months=['month1','month2','month3','month4']
+    for i in range(0, 4) :
+        data[months[i]] = data.PromoInterval.apply(lambda x: x.split(',')[i])
+        data.loc[data[months[i]] == 'Jan', months[i]] = 1
+        data.loc[data[months[i]] == 'Feb', months[i]] = 2
+        data.loc[data[months[i]] == 'Mar', months[i]] = 3
+        data.loc[data[months[i]] == 'Apr', months[i]] = 4
+        data.loc[data[months[i]] == 'May', months[i]] = 5
+        data.loc[data[months[i]] == 'Jun', months[i]] = 6
+        data.loc[data[months[i]] == 'Jul', months[i]] = 7
+        data.loc[data[months[i]] == 'Aug', months[i]] = 8
+        data.loc[data[months[i]] == 'Sept', months[i]] = 9
+        data.loc[data[months[i]] == 'Oct', months[i]] = 10
+        data.loc[data[months[i]] == 'Nov', months[i]] = 11
+        data.loc[data[months[i]] == 'Dec', months[i]] = 12
+        data[months[i]] = data[months[i]].astype(float)
+    
+    return data
+
+# merge train and test with store
+
+train=pd.merge(train, store, on=['Store'])
+test=pd.merge(test, store, on=['Store'])
+
+# transform
+train = train[train["Open"] != 0]
+train=transform(train)
+test=transform(test)
+
+customers_means = train.groupby('Store').mean().Customers
+customers_means.name = 'CustomersMean'
+
+train = train.join(customers_means, on='Store')
+test = test.join(customers_means, on='Store')
+
+Y_train=train.iloc[:, 3].values
+
+Xtrain=train.drop(['Date','Sales','PromoInterval','Customers'],axis=1)
+X_train=Xtrain.iloc[:,:22].values
+
+Xtest=test.drop(['Date','Id','PromoInterval'],axis=1)
+X_test=Xtest.iloc[:,:22].values
+
+#Random Forest
+# Fitting Random Forest Regression to the dataset
+from sklearn.ensemble import RandomForestRegressor
+regressor = RandomForestRegressor(n_estimators = 10, random_state = 0)
+regressor.fit(X_train, Y_train)
+
+# Predicting a new result
+y_pred = regressor.predict(X_test)
+
+submission = pd.DataFrame({"Id": test["Id"], "Sales": y_pred})
+submission.to_csv("submission.csv", index=False)
